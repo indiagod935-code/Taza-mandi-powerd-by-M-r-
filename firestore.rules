@@ -1,0 +1,299 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Pillar 0: Default-deny global catch-all safety net
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Global hardened helper primitives
+    function isValidId(id) {
+      return id is string && id.size() >= 1 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isVerified() {
+      return isSignedIn() && request.auth.token.email_verified == true;
+    }
+
+    function isOwner(userId) {
+      return isVerified() && request.auth.uid == userId;
+    }
+
+    function isBootstrapAdmin() {
+      return isVerified() && request.auth.token.email == 'rp2824173@gmail.com';
+    }
+
+    function isAdmin() {
+      return isBootstrapAdmin() || (
+        isVerified() && exists(/databases/$(database)/documents/admins/$(request.auth.uid))
+      );
+    }
+
+    // Validation Blueprint: UserProfile (/users/{userId})
+    function isValidUserProfile(data, userId) {
+      return data.keys().hasAll([
+        'uid', 'name', 'email', 'loginProvider', 'acceptedTerms', 'createdAt', 'updatedAt'
+      ]) &&
+      data.keys().hasOnly([
+        'uid', 'name', 'email', 'phone', 'flat', 'society', 'fullAddress',
+        'loginProvider', 'acceptedTerms', 'createdAt', 'updatedAt'
+      ]) &&
+      isValidId(data.uid) &&
+      data.uid == userId &&
+      data.name is string && data.name.size() >= 1 && data.name.size() <= 100 &&
+      data.email is string && data.email.size() >= 3 && data.email.size() <= 160 &&
+      (!('phone' in data) || (data.phone is string && data.phone.size() <= 24)) &&
+      (!('flat' in data) || (data.flat is string && data.flat.size() <= 60)) &&
+      (!('society' in data) || (data.society is string && data.society.size() <= 140)) &&
+      (!('fullAddress' in data) || (data.fullAddress is string && data.fullAddress.size() <= 280)) &&
+      data.loginProvider is string && data.loginProvider in ['google', 'password', 'otp'] &&
+      data.acceptedTerms is bool && data.acceptedTerms == true &&
+      data.createdAt is timestamp &&
+      data.updatedAt is timestamp;
+    }
+
+    // Validation Blueprint: UserActivityEntry (/activityLogs/{logId})
+    function isValidActivityEntry(data, logId) {
+      return data.keys().hasAll([
+        'id', 'uid', 'eventType', 'actionTitle', 'createdAt'
+      ]) &&
+      data.keys().hasOnly([
+        'id', 'uid', 'userName', 'userEmail', 'eventType', 'actionTitle',
+        'details', 'pageTab', 'deviceSummary', 'createdAt'
+      ]) &&
+      isValidId(data.id) &&
+      data.id == logId &&
+      isValidId(data.uid) &&
+      data.uid == request.auth.uid &&
+      (!('userName' in data) || (data.userName is string && data.userName.size() <= 100)) &&
+      (!('userEmail' in data) || (data.userEmail is string && data.userEmail.size() <= 160)) &&
+      data.eventType is string && data.eventType.size() >= 2 && data.eventType.size() <= 48 &&
+      data.actionTitle is string && data.actionTitle.size() >= 1 && data.actionTitle.size() <= 180 &&
+      (!('details' in data) || (data.details is string && data.details.size() <= 400)) &&
+      (!('pageTab' in data) || (data.pageTab is string && data.pageTab.size() <= 60)) &&
+      (!('deviceSummary' in data) || (data.deviceSummary is string && data.deviceSummary.size() <= 80)) &&
+      data.createdAt is timestamp;
+    }
+
+    function isValidFestivalTheme(ft) {
+      return ft is map &&
+        ft.keys().hasAll([
+          'id', 'name', 'active', 'bannerTitle', 'bannerSubtitle',
+          'badgeText', 'accentHex', 'surfaceTone', 'logoPreset'
+        ]) &&
+        ft.keys().hasOnly([
+          'id', 'name', 'active', 'bannerTitle', 'bannerSubtitle',
+          'badgeText', 'accentHex', 'surfaceTone', 'logoPreset', 'customLogoSvg'
+        ]) &&
+        ft.id is string && ft.id.size() >= 1 && ft.id.size() <= 48 &&
+        ft.name is string && ft.name.size() >= 1 && ft.name.size() <= 80 &&
+        ft.active is bool &&
+        ft.bannerTitle is string && ft.bannerTitle.size() <= 120 &&
+        ft.bannerSubtitle is string && ft.bannerSubtitle.size() <= 220 &&
+        ft.badgeText is string && ft.badgeText.size() <= 40 &&
+        ft.accentHex is string && ft.accentHex.size() <= 16 &&
+        ft.surfaceTone is string && ft.surfaceTone in ['emerald', 'saffron', 'magenta', 'royal', 'gold', 'tricolor'] &&
+        ft.logoPreset is string && ft.logoPreset in ['default', 'diwali', 'holi', 'ganesh', 'navratri', 'patriotic', 'eid', 'sankranti', 'harvest', 'custom'] &&
+        (!('customLogoSvg' in ft) || (ft.customLogoSvg is string && ft.customLogoSvg.size() <= 6000));
+    }
+
+    // Validation Blueprint: PlatformConfig (/platformConfig/{configId})
+    function isValidPlatformConfig(data, configId) {
+      return data.keys().hasAll([
+        'id', 'featureFlags', 'activeUiSample', 'updatedAt', 'updatedBy'
+      ]) &&
+      data.keys().hasOnly([
+        'id', 'featureFlags', 'activeUiSample', 'festivalTheme', 'updatedAt', 'updatedBy'
+      ]) &&
+      isValidId(data.id) &&
+      data.id == configId &&
+      data.featureFlags is map &&
+      data.featureFlags.keys().hasOnly([
+        'youtubeRecipeVideos', 'dishRecipeHelper', 'rateSavingsSuggestions',
+        'unitConversionToggle', 'healthBenefitsSlide', 'productInsightsModal',
+        'cartUpsellSuggestions', 'seasonalTrendingSection', 'storePromoBanner',
+        'windowCutoffBanner', 'voiceOrderAssistant', 'smartNotifications',
+        'communityPoolTab', 'mobileAccessoriesTab', 'leaderboardAndBadges',
+        'referralProgram', 'stickyCartBar', 'pwaInstallPrompt',
+        'productShareButtons', 'liveMapCorridor', 'languageSelector',
+        'founderPickBadge', 'adminBuyersAnalytics', 'batchSavingChart'
+      ]) &&
+      data.activeUiSample is string &&
+      data.activeUiSample in ['classic', 'quick_mart', 'fresh_boutique', 'hybrid_superapp'] &&
+      (!('festivalTheme' in data) || isValidFestivalTheme(data.festivalTheme)) &&
+      data.updatedAt is timestamp &&
+      data.updatedBy is string && data.updatedBy.size() >= 1 && data.updatedBy.size() <= 160;
+    }
+
+    // Validation Blueprint: OrderRecord (/orders/{orderId})
+    function isValidOrderRecord(data, orderId) {
+      return data.keys().hasAll([
+        'id', 'uid', 'customerName', 'status', 'totalAmount', 'createdAt', 'updatedAt'
+      ]) &&
+      data.keys().hasOnly([
+        'id', 'uid', 'customerName', 'status', 'totalAmount', 'createdAt', 'updatedAt'
+      ]) &&
+      isValidId(data.id) &&
+      data.id == orderId &&
+      isValidId(data.uid) &&
+      data.customerName is string && data.customerName.size() >= 1 && data.customerName.size() <= 100 &&
+      data.status is string && data.status in ['ordered', 'procured_at_mandi', 'packed', 'out_for_delivery', 'delivered', 'cancelled'] &&
+      data.totalAmount is number && data.totalAmount >= 0 &&
+      data.createdAt is timestamp &&
+      data.updatedAt is timestamp;
+    }
+
+    // Validation Blueprint: DeploymentState (/deploymentState/{envId})
+    function isValidDeploymentState(data, envId) {
+      return data.keys().hasAll([
+        'envId', 'version', 'releaseId', 'buildHash', 'buildHashShort',
+        'cacheHeadersValid', 'observedCacheControl', 'workspaceClean',
+        'bootedAt', 'updatedAt', 'updatedBy'
+      ]) &&
+      data.keys().hasOnly([
+        'envId', 'version', 'releaseId', 'buildHash', 'buildHashShort',
+        'cacheHeadersValid', 'observedCacheControl', 'workspaceClean',
+        'bootedAt', 'updatedAt', 'updatedBy'
+      ]) &&
+      data.envId is string &&
+      data.envId in ['development', 'production'] &&
+      data.envId == envId &&
+      data.version is string && data.version.size() >= 1 && data.version.size() <= 32 &&
+      data.releaseId is string && data.releaseId.size() >= 1 && data.releaseId.size() <= 64 &&
+      data.buildHash is string && data.buildHash.size() >= 8 && data.buildHash.size() <= 128 &&
+      data.buildHash.matches('^[a-fA-F0-9_\\-]+$') &&
+      data.buildHashShort is string && data.buildHashShort.size() >= 4 && data.buildHashShort.size() <= 16 &&
+      data.cacheHeadersValid is bool &&
+      data.observedCacheControl is string && data.observedCacheControl.size() <= 200 &&
+      data.workspaceClean is bool &&
+      data.bootedAt is string && data.bootedAt.size() >= 1 && data.bootedAt.size() <= 64 &&
+      data.updatedAt is timestamp &&
+      data.updatedBy is string && data.updatedBy.size() >= 1 && data.updatedBy.size() <= 160;
+    }
+
+    // Collection 1: /users/{userId} (Strict PII isolation)
+    match /users/{userId} {
+      allow get: if isValidId(userId) && (isOwner(userId) || isAdmin());
+      allow list: if isBootstrapAdmin();
+      allow create: if isValidId(userId) &&
+        isOwner(userId) &&
+        isValidUserProfile(incoming(), userId) &&
+        incoming().uid == request.auth.uid &&
+        incoming().createdAt == request.time &&
+        incoming().updatedAt == request.time;
+      allow update: if isValidId(userId) &&
+        isValidUserProfile(incoming(), userId) && (
+          isAdmin() || (
+            isOwner(userId) &&
+            incoming().uid == existing().uid &&
+            incoming().createdAt == existing().createdAt &&
+            incoming().updatedAt == request.time &&
+            incoming().diff(existing()).affectedKeys().hasOnly([
+              'name', 'phone', 'flat', 'society', 'fullAddress', 'loginProvider', 'updatedAt'
+            ])
+          )
+        );
+      allow delete: if isValidId(userId) && isAdmin();
+    }
+
+    // Collection 2: /activityLogs/{logId}
+    match /activityLogs/{logId} {
+      allow get: if isValidId(logId) && isVerified() && (
+        existing().uid == request.auth.uid || isAdmin()
+      );
+      allow list: if isVerified() && (
+        existing().uid == request.auth.uid || isBootstrapAdmin()
+      );
+      allow create: if isValidId(logId) &&
+        isVerified() &&
+        isValidActivityEntry(incoming(), logId) &&
+        incoming().createdAt == request.time;
+      allow update: if false;
+      allow delete: if isValidId(logId) && isAdmin();
+    }
+
+    // Collection 3: /admins/{adminUid}
+    match /admins/{adminUid} {
+      allow get: if isValidId(adminUid) && (isOwner(adminUid) || isAdmin());
+      allow list: if false;
+      allow create, update, delete: if false;
+    }
+
+    // Collection 4: /platformConfig/{configId}
+    match /platformConfig/{configId} {
+      allow get: if isValidId(configId) && isVerified();
+      allow list: if false;
+      allow create: if isValidId(configId) &&
+        isAdmin() &&
+        isValidPlatformConfig(incoming(), configId) &&
+        incoming().updatedAt == request.time;
+      allow update: if isValidId(configId) &&
+        isAdmin() &&
+        isValidPlatformConfig(incoming(), configId) &&
+        incoming().updatedAt == request.time;
+      allow delete: if false;
+    }
+
+    // Collection 5: /orders/{orderId} (Permanent non-deletable order history)
+    match /orders/{orderId} {
+      allow get: if isValidId(orderId) && isVerified() && (
+        existing().uid == request.auth.uid || isAdmin()
+      );
+      allow list: if isVerified() && (
+        existing().uid == request.auth.uid || isBootstrapAdmin()
+      );
+      allow create: if isValidId(orderId) &&
+        isVerified() &&
+        isValidOrderRecord(incoming(), orderId) &&
+        incoming().uid == request.auth.uid &&
+        incoming().createdAt == request.time &&
+        incoming().updatedAt == request.time;
+      allow update: if isValidId(orderId) &&
+        isVerified() &&
+        isValidOrderRecord(incoming(), orderId) &&
+        incoming().id == existing().id &&
+        incoming().uid == existing().uid &&
+        incoming().createdAt == existing().createdAt &&
+        incoming().updatedAt == request.time && (
+          isAdmin() || (
+            existing().uid == request.auth.uid &&
+            existing().status != 'delivered' &&
+            existing().status != 'cancelled' &&
+            incoming().status == 'cancelled' &&
+            incoming().diff(existing()).affectedKeys().hasOnly(['status', 'updatedAt'])
+          )
+        );
+      allow delete: if false;
+    }
+
+    // Collection 6: /deploymentState/{envId} (Admin-only Preview & Production build hash telemetry)
+    match /deploymentState/{envId} {
+      allow get: if isValidId(envId) && envId in ['development', 'production'] && isAdmin();
+      allow list: if false;
+      allow create: if isValidId(envId) &&
+        envId in ['development', 'production'] &&
+        isAdmin() &&
+        isValidDeploymentState(incoming(), envId) &&
+        incoming().updatedAt == request.time;
+      allow update: if isValidId(envId) &&
+        envId in ['development', 'production'] &&
+        isAdmin() &&
+        isValidDeploymentState(incoming(), envId) &&
+        incoming().envId == existing().envId &&
+        incoming().updatedAt == request.time;
+      allow delete: if false;
+    }
+  }
+}

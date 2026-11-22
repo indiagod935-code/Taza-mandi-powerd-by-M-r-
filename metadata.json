@@ -1,0 +1,6 @@
+{
+  "name": "ताज़ाMandi - Demand-Driven Fresh Produce Aggregator",
+  "description": "Zero-waste daily vegetable & fruit procurement platform with live community demand pooling, 9PM-9AM ordering windows, and APMC wholesale mandi batching.",
+  "requestFramePermissions": ["microphone", "geolocation", "camera"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

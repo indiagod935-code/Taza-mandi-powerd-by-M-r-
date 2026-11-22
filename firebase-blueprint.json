@@ -1,0 +1,301 @@
+{
+  "entities": {
+    "UserProfile": {
+      "title": "UserProfile",
+      "description": "Verified customer profile stored under isolated per-user UID with strict PII access controls.",
+      "type": "object",
+      "properties": {
+        "uid": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100
+        },
+        "email": {
+          "type": "string",
+          "minLength": 3,
+          "maxLength": 160
+        },
+        "phone": {
+          "type": "string",
+          "maxLength": 24
+        },
+        "flat": {
+          "type": "string",
+          "maxLength": 60
+        },
+        "society": {
+          "type": "string",
+          "maxLength": 140
+        },
+        "fullAddress": {
+          "type": "string",
+          "maxLength": 280
+        },
+        "loginProvider": {
+          "type": "string",
+          "enum": ["google", "password", "otp"]
+        },
+        "acceptedTerms": {
+          "type": "boolean"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["uid", "name", "email", "loginProvider", "acceptedTerms", "createdAt", "updatedAt"]
+    },
+    "UserActivityEntry": {
+      "title": "UserActivityEntry",
+      "description": "Audit trail event capturing user authentication, terms consent, navigation, and order actions.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "uid": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "userName": {
+          "type": "string",
+          "maxLength": 100
+        },
+        "userEmail": {
+          "type": "string",
+          "maxLength": 160
+        },
+        "eventType": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 48
+        },
+        "actionTitle": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 180
+        },
+        "details": {
+          "type": "string",
+          "maxLength": 400
+        },
+        "pageTab": {
+          "type": "string",
+          "maxLength": 60
+        },
+        "deviceSummary": {
+          "type": "string",
+          "maxLength": 80
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["id", "uid", "eventType", "actionTitle", "createdAt"]
+    },
+    "AdminRecord": {
+      "title": "AdminRecord",
+      "description": "Trusted administrator UID mapping managed out-of-band.",
+      "type": "object",
+      "properties": {
+        "uid": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "role": {
+          "type": "string",
+          "enum": ["admin"]
+        }
+      },
+      "required": ["uid", "role"]
+    },
+    "PlatformConfig": {
+      "title": "PlatformConfig",
+      "description": "Admin-controlled feature switches, UI sample preset, and festival/special-day logo & theme configuration.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "featureFlags": {
+          "type": "object",
+          "description": "Map of boolean feature switches controlling customer UI widgets, Founder Pick badge visibility, and toggles."
+        },
+        "activeUiSample": {
+          "type": "string",
+          "enum": ["classic", "quick_mart", "fresh_boutique", "hybrid_superapp"]
+        },
+        "festivalTheme": {
+          "type": "object",
+          "description": "Active festival or special-day store banner theme and dynamic logo preset."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedBy": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 160
+        }
+      },
+      "required": ["id", "featureFlags", "activeUiSample", "updatedAt", "updatedBy"]
+    },
+    "OrderRecord": {
+      "title": "OrderRecord",
+      "description": "Immutable customer order history record. Customers may view their own orders and cancel before dispatch, but cannot delete order history.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "uid": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "customerName": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100
+        },
+        "status": {
+          "type": "string",
+          "enum": ["ordered", "procured_at_mandi", "packed", "out_for_delivery", "delivered", "cancelled"]
+        },
+        "totalAmount": {
+          "type": "number"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["id", "uid", "customerName", "status", "totalAmount", "createdAt", "updatedAt"]
+    },
+    "DeploymentState": {
+      "title": "DeploymentState",
+      "description": "Verified build hash, Cache-Control validation status, and release metadata recorded per runtime environment (development preview vs published production).",
+      "type": "object",
+      "properties": {
+        "envId": {
+          "type": "string",
+          "enum": ["development", "production"]
+        },
+        "version": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 32
+        },
+        "releaseId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64
+        },
+        "buildHash": {
+          "type": "string",
+          "minLength": 8,
+          "maxLength": 128,
+          "pattern": "^[a-fA-F0-9_\\-]+$"
+        },
+        "buildHashShort": {
+          "type": "string",
+          "minLength": 4,
+          "maxLength": 16
+        },
+        "cacheHeadersValid": {
+          "type": "boolean"
+        },
+        "observedCacheControl": {
+          "type": "string",
+          "maxLength": 200
+        },
+        "workspaceClean": {
+          "type": "boolean"
+        },
+        "bootedAt": {
+          "type": "string",
+          "format": "date-time",
+          "maxLength": 64
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedBy": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 160
+        }
+      },
+      "required": [
+        "envId",
+        "version",
+        "releaseId",
+        "buildHash",
+        "buildHashShort",
+        "cacheHeadersValid",
+        "observedCacheControl",
+        "workspaceClean",
+        "bootedAt",
+        "updatedAt",
+        "updatedBy"
+      ]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": { "$ref": "#/entities/UserProfile" },
+      "description": "Strictly private per-user profile & verified social login record."
+    },
+    "/activityLogs/{logId}": {
+      "schema": { "$ref": "#/entities/UserActivityEntry" },
+      "description": "User activity audit logs readable by owning user or verified admin."
+    },
+    "/admins/{adminUid}": {
+      "schema": { "$ref": "#/entities/AdminRecord" },
+      "description": "Administrator role lookup documents (read-only from clients)."
+    },
+    "/platformConfig/{configId}": {
+      "schema": { "$ref": "#/entities/PlatformConfig" },
+      "description": "Global platform feature toggles and active UI sample preset managed strictly by admins."
+    },
+    "/orders/{orderId}": {
+      "schema": { "$ref": "#/entities/OrderRecord" },
+      "description": "Non-deletable customer order history records protected by strict Firestore rules."
+    },
+    "/deploymentState/{envId}": {
+      "schema": { "$ref": "#/entities/DeploymentState" },
+      "description": "Per-environment build hash & Cache-Control sync telemetry managed strictly by verified admins."
+    }
+  }
+}
